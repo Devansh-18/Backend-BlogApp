@@ -1,5 +1,6 @@
 const Blog = require("../models/blogModel");
 const Tag = require("../models/tagModel");
+var ObjectId = require('mongoose').Types.ObjectId;
 
 exports.createBlog = async (req,res)=>{
     try{
@@ -45,18 +46,44 @@ exports.createBlog = async (req,res)=>{
 };
 
 exports.getAllBlogs = async (req,res)=>{
+    
     try{
         const tag = req.query.tag;
         const hashtag = req.query.hashtag;
+        const blogId = req.query.blogId;
+        const newBlogId = new ObjectId(blogId);
+        
 
-        if(!tag && !hashtag){
-            const blogs = await Blog.find();
+        if(!tag && !hashtag && !blogId){
+            // const blogs = await Blog.find();
+            //
+            let {page} = req.query;
+            page = parseInt(page,10)||1;
+            const pageSize = 10;
+            const blogsdata = await Blog.aggregate([
+                {
+                  $facet: {
+                    metadata: [{ $count: 'totalCount' }],
+                    data: [{ $skip: (page - 1) * pageSize }, { $limit: pageSize }],
+                  },
+                },
+              ]);
+              
+              const blogs = blogsdata[0].data;
+              const totalCount = blogsdata[0].metadata[0].totalCount;
+              
+            
+            const totalPages = Math.ceil(totalCount/pageSize);
             return res.status(200).json({
-                blogs,
+                page,
+                pageSize,
+                totalPages,
+                blogs,                  
             })
         }
         else if(tag){
-            const blogs = await Tag.findOne({title:tag}).populate("blogs").exit();
+            const blogsdata = await Tag.findOne({title:tag}).populate({path: 'blogs'});
+            const blogs = blogsdata.blogs;
             return res.status(200).json({
                 success:true,
                 message:'Blogs related to tag fetched successfully',
@@ -64,41 +91,48 @@ exports.getAllBlogs = async (req,res)=>{
             })
         }
         else if(hashtag){
-            const blogs = await Blog.find({hashtag:{$elemMatch:hashtag}})
+            let {page} = req.query;
+            page = parseInt(page,10)||1;
+            // console.log(page);
+            const pageSize = 10;
+            // const blogs = await Blog.find({hashtag:hashtag}).skip(pageSize * (page-1))
+            // .limit(pageSize)
+            const blogsdata = await Blog.aggregate([
+                {$match : {hashtag:hashtag}},
+                {
+                    $facet: {
+                      metadata: [{ $count: 'totalCount' }],
+                      data: [{ $skip: (page - 1) * pageSize }, { $limit: pageSize }],
+                    },
+                  },
+            ])
+            const blogs = blogsdata[0].data;
+            const totalCount = blogsdata[0].metadata[0].totalCount;
+            return res.status(200).json({
+                page,
+                pageSize,
+                totalCount,
+                blogs,                  
+            }); 
+        } 
+        else if(blogId){
+            const blog = await Blog.findById(newBlogId);
+            const tag = blog.tag;
+            const relatedTagData = await Tag.findOne({title:tag}).populate({path: 'blogs'});
+            const relatedTag = relatedTagData.blogs;
             return res.status(200).json({
                 success:true,
-                message:'Blogs related to hashtag fetched successfully',
-                blogs,
+                message:'Blog Page fetched Successfully',
+                blog,
+                relatedTag
             })
-        }
-        
+        }       
     }
     catch(error){
+        console.log(error.message)
         return res.status(400).json({
             error:"Error while fetching Blogs",
             message:error.message
-        })
-    }
-}
-
-exports.getBlogById = async (req,res)=>{
-    try{
-        const blogId = req.params.blogId;
-        const blog = await Blog.findById({blogId});
-        const relatedTag = await Tag.findOne({title:blog.tag}).populate("blogs").exit();
-        return res.status(200).json({
-            success:true,
-            message:'Blog Page fetched Successfully',
-            blog,
-            relatedTag
-        })
-    }
-    catch(error){
-        console.log(error.message);
-        return res.status(404).json({
-            success:false,
-            message:'Blog by Id not fetched',
-            error:error.message
         })
     }
 }

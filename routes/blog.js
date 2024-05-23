@@ -3,13 +3,11 @@ const router = express.Router();
 
 //Import Controllers
 
-const {createBlog, getAllBlogs, getBlogById} = require("../controllers/blogController");
+const {createBlog, getAllBlogs} = require("../controllers/blogController");
 
 router.post("/blogs/create",createBlog);
 
 router.get("/blogs/getblog",getAllBlogs);
-
-router.get("/blogs/getblog/:blogId",getBlogById);
 
 //export
 module.exports = router;

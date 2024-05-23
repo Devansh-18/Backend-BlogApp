@@ -17,7 +17,6 @@ const blogSchema = new mongoose.Schema({
     tag:{
         type:String,
         trim:true,
-        enum:["AI", "ML", "Software", "Web Development", "Networking", "Algorithms", "Designing"]
     },
     hashtag:[{
         type:String,
